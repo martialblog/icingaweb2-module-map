@@ -13,23 +13,23 @@ use Exception;
  */
 class ModuleConfig
 {
-    // These options can be overwritten via URL parameters
-    public const URL_OVERRIDABLE_PARAMS = [
-        'cluster_problem_count',
-        'default_lat',
-        'default_long',
-        'default_zoom',
-        'disable_cluster_at_zoom',
-        'max_native_zoom',
-        'max_zoom',
-        'min_zoom',
-        'popup_mouseover',
-        'stateType',
-        'tile_url',
+    // Configuration defaults
+    public const DEFAULTS = [
+        'cluster_problem_count' => false,
+        'default_lat' => '52.515855',
+        'default_long' => '13.377485',
+        'default_zoom' => 4,
+        'max_native_zoom' => 19,
+        'max_zoom' => 19,
+        'min_zoom' => 2,
+        'stateType' => 'soft',
+        'popup_mouseover' => false,
+        'tile_url' => '//{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     ];
 
     /**
-     * getMapsConfig returns the module's maps configuration
+     * getMapsConfig returns the module's maps configuration.
+     * The maps.ini can contain named overrides for various option.
      *
      * @return Config
      */
@@ -39,7 +39,7 @@ class ModuleConfig
     }
 
     /**
-     * getConfig returns the module's configuration
+     * getConfig returns the module's configuration.
      *
      * @return Config
      */
@@ -51,26 +51,10 @@ class ModuleConfig
     /**
      * getConfigWithDefaults loads all configuration options with their defaults.
      *
-     * @return array
+     * @return ?Config
      */
-    public static function getConfigWithDefaults(?Config $moduleConfig = null): Config
+    public static function getConfigWithDefaults(?Config $moduleConfig = null): ?Config
     {
-        $default = [
-            'cluster_problem_count' => false,
-            'default_lat' => '52.515855',
-            'default_long' => '13.377485',
-            'default_zoom' => 4,
-            'max_native_zoom' => 19,
-            'max_zoom' => 19,
-            'min_zoom' => 2,
-            'stateType' => 'soft',
-            'opencage_apikey' => '',
-            'popup_mouseover' => false,
-            'tile_url' => '//{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        ];
-
-        $default['disable_cluster_at_zoom'] = $default['max_zoom'] - 1;
-
         // Try to load the configuration
         if ($moduleConfig === null) {
             try {
@@ -78,24 +62,26 @@ class ModuleConfig
                 Logger::debug('Loaded Map module configuration');
             } catch (Exception $e) {
                 Logger::error('Failed to load Map module configuration: %s', $e);
-                return $default;
+                return null;
             }
         }
 
+        $disable_zoom_default = self::DEFAULTS['max_zoom'] - 1
+
         $config = [];
 
-        $config['cluster_problem_count'] = (bool) $moduleConfig->get('map', 'cluster_problem_count', $default['cluster_problem_count']);
-        $config['default_lat'] = $moduleConfig->get('map', 'default_lat', $default['default_lat']);
-        $config['default_long'] = $moduleConfig->get('map', 'default_long', $default['default_long']);
-        $config['default_zoom'] = (int) $moduleConfig->get('map', 'default_zoom', $default['default_zoom']);
-        $config['max_native_zoom'] = (int) $moduleConfig->get('map', 'max_native_zoom', $default['max_native_zoom']);
-        $config['max_zoom'] = (int) $moduleConfig->get('map', 'max_zoom', $default['max_zoom']);
-        $config['min_zoom'] = (int) $moduleConfig->get('map', 'min_zoom', $default['min_zoom']);
-        $config['stateType'] = $moduleConfig->get('map', 'min_zoom', $default['stateType']);
-        $config['disable_cluster_at_zoom'] = (int) $moduleConfig->get('map', 'disable_cluster_at_zoom', $default['disable_cluster_at_zoom']);
-        $config['opencage_apikey'] = $moduleConfig->get('map', 'opencage_apikey', $default['opencage_apikey']);
-        $config['popup_mouseover'] = (bool) $moduleConfig->get('map', 'popup_mouseover', $default['popup_mouseover']);
-        $config['tile_url'] = $moduleConfig->get('map', 'tile_url', $default['tile_url']);
+        $config['cluster_problem_count'] = (bool) $moduleConfig->get('map', 'cluster_problem_count', self::DEFAULTS['cluster_problem_count']);
+        $config['default_lat'] = $moduleConfig->get('map', 'default_lat', self::DEFAULTS['default_lat']);
+        $config['default_long'] = $moduleConfig->get('map', 'default_long', self::DEFAULTS['default_long']);
+        $config['default_zoom'] = (int) $moduleConfig->get('map', 'default_zoom', self::DEFAULTS['default_zoom']);
+        $config['max_native_zoom'] = (int) $moduleConfig->get('map', 'max_native_zoom', self::DEFAULTS['max_native_zoom']);
+        $config['max_zoom'] = (int) $moduleConfig->get('map', 'max_zoom', self::DEFAULTS['max_zoom']);
+        $config['min_zoom'] = (int) $moduleConfig->get('map', 'min_zoom', self::DEFAULTS['min_zoom']);
+        $config['stateType'] = $moduleConfig->get('map', 'stateType', self::DEFAULTS['stateType']);
+        $config['disable_cluster_at_zoom'] = (int) $moduleConfig->get('map', 'disable_cluster_at_zoom', $disable_zoom_default);
+        $config['opencage_apikey'] = $moduleConfig->get('map', 'opencage_apikey', '');
+        $config['popup_mouseover'] = (bool) $moduleConfig->get('map', 'popup_mouseover', self::DEFAULTS['popup_mouseover']);
+        $config['tile_url'] = $moduleConfig->get('map', 'tile_url', self::DEFAULTS['tile_url']);
 
         return Config::fromArray($config);
     }

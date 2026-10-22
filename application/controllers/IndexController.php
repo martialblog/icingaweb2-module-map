@@ -15,6 +15,21 @@ use ipl\Web\Compat\CompatController;
 
 class IndexController extends CompatController
 {
+    // These options can be overwritten via URL parameters
+    private const URL_OVERRIDABLE_PARAMS = [
+        'cluster_problem_count',
+        'default_lat',
+        'default_long',
+        'default_zoom',
+        'disable_cluster_at_zoom',
+        'max_native_zoom',
+        'max_zoom',
+        'min_zoom',
+        'popup_mouseover',
+        'stateType',
+        'tile_url',
+    ];
+
     /**
      * indexAction returns the main HTML element for the Map module.
      * This HTML element is then associated with Leaflet by the JavaScript section of this module.
@@ -41,10 +56,10 @@ class IndexController extends CompatController
         }
 
         // Precedence for loading configuration:
-        // 1. The URL parameters
-        // 2. A stored map in the maps.ini
-        // 3. The user's preferences
-        // 4. The module's configuration
+        // 1. the module's configuration are the default
+        // 2. The user's preferences
+        // 3. A stored map in the maps.ini
+        // 4. The URL parameters
 
         // Merge the user preferences into the default
         $userPreferences = $this->Auth()->getUser()->getPreferences();
@@ -52,45 +67,57 @@ class IndexController extends CompatController
             $config->getSection("map")->merge($userPreferences->get("map"));
         }
 
+        // TODO: Merge in the stored maps.ini config if exists
+
+        // Then override with URL PARAMS
+
+        // This will store the attributes we then attach to the map HTML element
+        $mapAttributes = $config->toArray();
+
+        // TODO: what does this param do and why?
+        $showHost = $this->params->get("showHost");
+        $mapAttributes['map_show_host'] = (! empty($showHost) ? preg_replace("/[\'\;]/", "", $showHost) : null);
+
+        $mapAttributes['expand'] = (bool) $this->params->get('expand');
+
         // Check the URL parameters and override config if they are set
-        foreach (ModuleConfig::URL_OVERRIDABLE_PARAMS as $parameter) {
-            if ($this->params->has($parameter)) {
-                // If the parameter is present in the URL
-                $this->view->$parameter = $this->params->get($parameter);
-            } elseif (isset($map) && $mapConfig->getSection($map)->offsetExists($parameter)) {
-                // If a maps.ini is set and has the given parameter
-                $this->view->$parameter = $mapConfig->get($map, $parameter);
-            } else {
-                // Use the module config and its defaults as fallback
-                $this->view->$parameter = $config->get("map", $parameter);
-            }
-        }
+        // foreach (self::URL_OVERRIDABLE_PARAMS as $parameter) {
+        //     if ($this->params->has($parameter)) {
+        //         // If the parameter is present in the URL
+        //         $this->view->$parameter = $this->params->get($parameter);
+        //     } elseif (isset($map) && $mapConfig->getSection($map)->offsetExists($parameter)) {
+        //         // If a maps.ini is set and has the given parameter
+        //         $this->view->$parameter = $mapConfig->get($map, $parameter);
+        //     } else {
+        //         // Use the module config and its defaults as fallback
+        //         $this->view->$parameter = $config->get("map", $parameter);
+        //     }
+        // }
 
-        if (!$this->view->disable_cluster_at_zoom) {
-            $this->view->disable_cluster_at_zoom = $this->view->max_zoom - 1;
-        }
+        // if (!$this->view->disable_cluster_at_zoom) {
+        //     $this->view->disable_cluster_at_zoom = $this->view->max_zoom - 1;
+        // }
 
-        $pattern = "/^([_]{0,1}(host|service))|\(|(object|state)Type/";
-
-        $urlParameters = $this->filterArray($this->params->toArray(false), $pattern);
+        // TODO What does this do and why?
+        // $pattern = "/^([_]{0,1}(host|service))|\(|(object|state)Type/";
+        // $urlParameters = $this->filterArray($this->params->toArray(false), $pattern);
 
         if (isset($map)) {
             $mapParameters = $this->filterArray($mapConfig->getSection($map)->toArray(), $pattern);
             $urlParameters = array_merge($mapParameters, $urlParameters);
         }
 
-        array_walk($urlParameters, function (&$a, $b) {
-            $a = $b . "=" . $a;
-        });
-
-        $id = uniqid();
-        $showHost = $this->params->get("showHost");
+        // TODO: What?
+        // array_walk($urlParameters, function (&$a, $b) {
+        //     $a = $b . "=" . $a;
+        // });
 
         // The map-script element holds the configuration for the module that
         // we need in the JavaScript part to render the map.
         $this->addContent(new HtmlElement('div', Attributes::create([
             'id' => 'map-script',
             'data-map-attrs' => Json::encode([
+                'id' => uniqid(),
                 'map_default_zoom' => !empty($this->view->default_zoom) ? (int) $this->view->default_zoom : null,
                 'map_default_long' => !empty($this->view->default_long) ? preg_replace("/[^0-9\.\,\-]/", "", $this->view->default_long) : null,
                 'map_default_lat' => !empty($this->view->default_lat) ? preg_replace("/[^0-9\.\,\-]/", "", $this->view->default_lat) : null,
@@ -101,12 +128,15 @@ class IndexController extends CompatController
                 'tile_url' => preg_replace("/[\'\;]/", "", $this->view->tile_url),
                 'cluster_problem_count' => (int) $this->view->cluster_problem_count,
                 'popup_mouseover' => (int) $this->view->popup_mouseover,
-                'map_show_host' => (! empty($showHost) ? preg_replace("/[\'\;]/", "", $showHost) : null),
+                'map_show_host' => $mapAttributes['map_show_host'],
+                'expand' => $mapAttributes['expand'],
+
+                // TODO: I don't know what this does and why
                 'url_parameters' => implode('&', $urlParameters),
-                'id' => $id,
+
                 // TODO: Why use another attribute name here?
                 'dashlet' => (bool) $this->view->compact,
-                'expand' => (bool) $this->params->get('expand'),
+
                 'isUsingIcingadb' => Module::exists('icingadb') && IcingadbSupport::useIcingaDbAsBackend(),
                 'service_status' => [
                     0 => [$this->translate('OK', 'icinga.state'), 'OK'],
